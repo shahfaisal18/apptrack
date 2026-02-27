@@ -1,313 +1,100 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Alert,
-} from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Search, Trash2, Filter } from 'lucide-react-native';
-import { useExpenses } from '@/hooks/useExpenses';
-import { EXPENSE_CATEGORIES } from '@/types/expense';
+import { useHabits } from '@/hooks/useHabits';
 
-export default function ExpensesList() {
-  const { expenses, deleteExpense } = useExpenses();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string | null>(null);
+type ViewMode = 'daily' | 'weekly' | 'monthly';
 
-  const filteredExpenses = expenses
-    .filter(expense => {
-      const matchesSearch = expense.description
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase());
-      const matchesCategory = selectedCategoryFilter 
-        ? expense.category.id === selectedCategoryFilter 
-        : true;
-      return matchesSearch && matchesCategory;
-    })
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+export default function HabitViewsScreen() {
+  const { habits, formatDate, getDatesBack, getCompletionCountByDate } = useHabits();
+  const [viewMode, setViewMode] = useState<ViewMode>('daily');
 
-  const handleDeleteExpense = (id: string, description: string) => {
-    Alert.alert(
-      'Delete Expense',
-      `Are you sure you want to delete "${description}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => deleteExpense(id) },
-      ]
-    );
-  };
+  const today = formatDate(new Date());
 
-  const totalAmount = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+  const chartDates = useMemo(() => {
+    if (viewMode === 'daily') return getDatesBack(1);
+    if (viewMode === 'weekly') return getDatesBack(7);
+    return getDatesBack(30).filter((_, idx) => idx % 5 === 0);
+  }, [getDatesBack, viewMode]);
+
+  const maxDone = Math.max(1, ...chartDates.map((date) => getCompletionCountByDate(date)));
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Expenses</Text>
-        <Text style={styles.headerSubtitle}>
-          {filteredExpenses.length} transactions • ${totalAmount.toFixed(2)}
-        </Text>
-      </View>
-
-      {/* Search and Filter */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchInputContainer}>
-          <Search size={20} color="#6B7280" />
-          <TextInput
-            style={styles.searchInput}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search expenses..."
-            placeholderTextColor="#9CA3AF"
-          />
+      <ScrollView>
+        <View style={styles.header}>
+          <Text style={styles.title}>Daily / Weekly / Monthly</Text>
+          <Text style={styles.subtitle}>Interactive habit completion graphs</Text>
         </View>
-      </View>
 
-      {/* Category Filter */}
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        style={styles.filterContainer}
-        contentContainerStyle={styles.filterContent}
-      >
-        <TouchableOpacity
-          style={[
-            styles.filterChip,
-            !selectedCategoryFilter && styles.filterChipActive,
-          ]}
-          onPress={() => setSelectedCategoryFilter(null)}
-        >
-          <Text style={[
-            styles.filterChipText,
-            !selectedCategoryFilter && styles.filterChipTextActive,
-          ]}>
-            All
-          </Text>
-        </TouchableOpacity>
-        {EXPENSE_CATEGORIES.map((category) => (
-          <TouchableOpacity
-            key={category.id}
-            style={[
-              styles.filterChip,
-              selectedCategoryFilter === category.id && styles.filterChipActive,
-            ]}
-            onPress={() => setSelectedCategoryFilter(
-              selectedCategoryFilter === category.id ? null : category.id
-            )}
-          >
-            <Text style={styles.filterChipEmoji}>{category.icon}</Text>
-            <Text style={[
-              styles.filterChipText,
-              selectedCategoryFilter === category.id && styles.filterChipTextActive,
-            ]}>
-              {category.name}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+        <View style={styles.segmentWrap}>
+          {(['daily', 'weekly', 'monthly'] as ViewMode[]).map((item) => (
+            <TouchableOpacity
+              key={item}
+              style={[styles.segmentButton, viewMode === item && styles.segmentButtonActive]}
+              onPress={() => setViewMode(item)}>
+              <Text style={[styles.segmentText, viewMode === item && styles.segmentTextActive]}>{item}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-      {/* Expenses List */}
-      <ScrollView style={styles.listContainer} showsVerticalScrollIndicator={false}>
-        {filteredExpenses.length > 0 ? (
-          <View style={styles.expensesList}>
-            {filteredExpenses.map((expense) => (
-              <View key={expense.id} style={styles.expenseItem}>
-                <View style={styles.expenseLeft}>
-                  <View style={[styles.expenseIcon, { backgroundColor: expense.category.color }]}>
-                    <Text style={styles.expenseEmoji}>{expense.category.icon}</Text>
-                  </View>
-                  <View style={styles.expenseDetails}>
-                    <Text style={styles.expenseDescription}>{expense.description}</Text>
-                    <Text style={styles.expenseCategory}>{expense.category.name}</Text>
-                    <Text style={styles.expenseDate}>
-                      {new Date(expense.date).toLocaleDateString()}
-                    </Text>
-                  </View>
+        <View style={styles.graphCard}>
+          <Text style={styles.graphTitle}>Completions</Text>
+          <View style={styles.barsRow}>
+            {chartDates.map((date) => {
+              const done = getCompletionCountByDate(date);
+              const barHeight = (done / maxDone) * 140 + 8;
+              return (
+                <View key={date} style={styles.barColumn}>
+                  <Text style={styles.barValue}>{done}</Text>
+                  <View style={[styles.bar, { height: barHeight }]} />
+                  <Text style={styles.barLabel}>{viewMode === 'daily' ? 'today' : date.slice(5)}</Text>
                 </View>
-                <View style={styles.expenseRight}>
-                  <Text style={styles.expenseAmount}>-${expense.amount.toFixed(2)}</Text>
-                  <TouchableOpacity
-                    style={styles.deleteButton}
-                    onPress={() => handleDeleteExpense(expense.id, expense.description)}
-                  >
-                    <Trash2 size={16} color="#EF4444" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
-        ) : (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>
-              {searchQuery || selectedCategoryFilter 
-                ? 'No expenses found matching your criteria' 
-                : 'No expenses yet. Add your first expense!'}
-            </Text>
-          </View>
-        )}
+        </View>
+
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>Status for {today}</Text>
+          {habits.map((habit) => (
+            <View key={habit.id} style={styles.summaryRow}>
+              <Text style={styles.summaryName}>{habit.name}</Text>
+              <Text style={[styles.badge, habit.completions[today] ? styles.done : styles.pending]}>
+                {habit.completions[today] ? 'Done' : 'Not done'}
+              </Text>
+            </View>
+          ))}
+          {habits.length === 0 ? <Text style={styles.emptyText}>No habits available yet.</Text> : null}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
-  header: {
-    padding: 24,
-    paddingBottom: 16,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-  },
-  searchContainer: {
-    paddingHorizontal: 24,
-    marginBottom: 16,
-  },
-  searchInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#1F2937',
-    paddingVertical: 14,
-    marginLeft: 12,
-  },
-  filterContainer: {
-    marginBottom: 24,
-  },
-  filterContent: {
-    paddingHorizontal: 24,
-    gap: 8,
-  },
-  filterChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    gap: 6,
-  },
-  filterChipActive: {
-    backgroundColor: '#10B981',
-    borderColor: '#10B981',
-  },
-  filterChipEmoji: {
-    fontSize: 14,
-  },
-  filterChipText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  filterChipTextActive: {
-    color: '#FFFFFF',
-  },
-  listContainer: {
-    flex: 1,
-  },
-  expensesList: {
-    paddingHorizontal: 24,
-    gap: 12,
-    paddingBottom: 24,
-  },
-  expenseItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  expenseLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  expenseIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  expenseEmoji: {
-    fontSize: 20,
-  },
-  expenseDetails: {
-    flex: 1,
-  },
-  expenseDescription: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 2,
-  },
-  expenseCategory: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 2,
-  },
-  expenseDate: {
-    fontSize: 12,
-    color: '#9CA3AF',
-  },
-  expenseRight: {
-    alignItems: 'flex-end',
-    gap: 8,
-  },
-  expenseAmount: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#EF4444',
-  },
-  deleteButton: {
-    padding: 4,
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 60,
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: '#6B7280',
-    fontSize: 16,
-    fontStyle: 'italic',
-  },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  header: { padding: 20 },
+  title: { fontSize: 26, fontWeight: '700', color: '#0F172A' },
+  subtitle: { marginTop: 4, color: '#64748B' },
+  segmentWrap: { flexDirection: 'row', marginHorizontal: 20, backgroundColor: '#E2E8F0', borderRadius: 10, padding: 4 },
+  segmentButton: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
+  segmentButtonActive: { backgroundColor: '#FFFFFF' },
+  segmentText: { textTransform: 'capitalize', color: '#475569', fontWeight: '600' },
+  segmentTextActive: { color: '#1D4ED8' },
+  graphCard: { margin: 20, backgroundColor: '#FFFFFF', borderRadius: 14, padding: 14 },
+  graphTitle: { fontWeight: '700', fontSize: 18, marginBottom: 14, color: '#0F172A' },
+  barsRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', minHeight: 180, gap: 4 },
+  barColumn: { flex: 1, alignItems: 'center' },
+  bar: { width: '70%', backgroundColor: '#2563EB', borderRadius: 7 },
+  barLabel: { marginTop: 6, fontSize: 10, color: '#64748B' },
+  barValue: { fontSize: 11, color: '#334155', marginBottom: 4 },
+  summaryCard: { marginHorizontal: 20, marginBottom: 24, backgroundColor: '#FFFFFF', borderRadius: 14, padding: 14 },
+  summaryTitle: { fontWeight: '700', fontSize: 18, color: '#0F172A', marginBottom: 8 },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
+  summaryName: { color: '#1E293B', flex: 1, paddingRight: 8 },
+  badge: { fontWeight: '600' },
+  done: { color: '#16A34A' },
+  pending: { color: '#DC2626' },
+  emptyText: { color: '#64748B' },
 });
