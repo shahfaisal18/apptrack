@@ -1,144 +1,86 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Alert,
-} from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Calendar, Check } from 'lucide-react-native';
-import { useExpenses } from '@/hooks/useExpenses';
-import { EXPENSE_CATEGORIES, ExpenseCategory } from '@/types/expense';
-import { router } from 'expo-router';
+import { Pencil, Plus, Trash2 } from 'lucide-react-native';
+import { useHabits } from '@/hooks/useHabits';
 
-export default function AddExpense() {
-  const { addExpense } = useExpenses();
-  const [amount, setAmount] = useState('');
+export default function ManageHabitsScreen() {
+  const { habits, addHabit, deleteHabit, updateHabit } = useHabits();
+
+  const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<ExpenseCategory | null>(null);
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [loading, setLoading] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
-  const handleSubmit = async () => {
-    if (!amount || !description || !selectedCategory) {
-      Alert.alert('Error', 'Please fill in all fields');
+  const submit = async () => {
+    if (!name.trim()) {
+      Alert.alert('Missing name', 'Please enter a habit name.');
       return;
     }
 
-    const amountNumber = parseFloat(amount);
-    if (isNaN(amountNumber) || amountNumber <= 0) {
-      Alert.alert('Error', 'Please enter a valid amount');
-      return;
+    if (editingId) {
+      await updateHabit(editingId, { name, description });
+      setEditingId(null);
+    } else {
+      await addHabit(name, description);
     }
 
-    setLoading(true);
-    try {
-      await addExpense({
-        amount: amountNumber,
-        description,
-        category: selectedCategory,
-        date: selectedDate,
-      });
-      
-      Alert.alert('Success', 'Expense added successfully!');
-      setAmount('');
-      setDescription('');
-      setSelectedCategory(null);
-      setSelectedDate(new Date());
-      router.push('/');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to add expense');
-    } finally {
-      setLoading(false);
-    }
+    setName('');
+    setDescription('');
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Add Expense</Text>
-          <Text style={styles.headerSubtitle}>Track your spending</Text>
+          <Text style={styles.title}>Manage Habits</Text>
+          <Text style={styles.subtitle}>Create, edit, and remove habits for Faisal</Text>
         </View>
 
-        <View style={styles.form}>
-          {/* Amount Input */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Amount</Text>
-            <View style={styles.amountContainer}>
-              <Text style={styles.currencySymbol}>$</Text>
-              <TextInput
-                style={styles.amountInput}
-                value={amount}
-                onChangeText={setAmount}
-                placeholder="0.00"
-                keyboardType="numeric"
-                placeholderTextColor="#9CA3AF"
-              />
-            </View>
-          </View>
-
-          {/* Description Input */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Description</Text>
-            <TextInput
-              style={styles.textInput}
-              value={description}
-              onChangeText={setDescription}
-              placeholder="What did you spend on?"
-              placeholderTextColor="#9CA3AF"
-            />
-          </View>
-
-          {/* Category Selection */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Category</Text>
-            <View style={styles.categoriesContainer}>
-              {EXPENSE_CATEGORIES.map((category) => (
-                <TouchableOpacity
-                  key={category.id}
-                  style={[
-                    styles.categoryOption,
-                    selectedCategory?.id === category.id && styles.categoryOptionSelected,
-                  ]}
-                  onPress={() => setSelectedCategory(category)}
-                >
-                  <View style={[styles.categoryOptionIcon, { backgroundColor: category.color }]}>
-                    <Text style={styles.categoryOptionEmoji}>{category.icon}</Text>
-                  </View>
-                  <Text style={styles.categoryOptionText}>{category.name}</Text>
-                  {selectedCategory?.id === category.id && (
-                    <Check size={20} color="#10B981" style={styles.checkIcon} />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* Date Selection */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Date</Text>
-            <TouchableOpacity style={styles.dateButton}>
-              <Calendar size={20} color="#6B7280" />
-              <Text style={styles.dateText}>
-                {selectedDate.toLocaleDateString()}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Submit Button */}
-          <TouchableOpacity
-            style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-            onPress={handleSubmit}
-            disabled={loading}
-          >
-            <Text style={styles.submitButtonText}>
-              {loading ? 'Adding...' : 'Add Expense'}
-            </Text>
+        <View style={styles.formCard}>
+          <TextInput
+            placeholder="Habit name (e.g. Read 20 minutes)"
+            style={styles.input}
+            value={name}
+            onChangeText={setName}
+          />
+          <TextInput
+            placeholder="Description (optional)"
+            style={[styles.input, styles.multiline]}
+            multiline
+            value={description}
+            onChangeText={setDescription}
+          />
+          <TouchableOpacity style={styles.primaryButton} onPress={submit}>
+            <Plus color="#fff" size={18} />
+            <Text style={styles.buttonText}>{editingId ? 'Save Habit' : 'Add Habit'}</Text>
           </TouchableOpacity>
+        </View>
+
+        <View style={styles.listSection}>
+          <Text style={styles.sectionTitle}>Existing Habits</Text>
+          {habits.length === 0 ? <Text style={styles.emptyText}>No habits yet.</Text> : null}
+          {habits.map((habit) => (
+            <View key={habit.id} style={styles.habitCard}>
+              <View style={styles.habitTextWrap}>
+                <Text style={styles.habitName}>{habit.name}</Text>
+                {!!habit.description && <Text style={styles.habitDescription}>{habit.description}</Text>}
+              </View>
+              <View style={styles.actions}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setEditingId(habit.id);
+                    setName(habit.name);
+                    setDescription(habit.description ?? '');
+                  }}
+                  style={styles.iconButton}>
+                  <Pencil size={18} color="#1D4ED8" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => deleteHabit(habit.id)} style={styles.iconButton}>
+                  <Trash2 size={18} color="#DC2626" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -146,156 +88,45 @@ export default function AddExpense() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  header: { padding: 20 },
+  title: { fontSize: 28, fontWeight: '700', color: '#0F172A' },
+  subtitle: { marginTop: 4, color: '#64748B' },
+  formCard: { marginHorizontal: 20, backgroundColor: '#FFFFFF', padding: 14, borderRadius: 14 },
+  input: {
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 10,
   },
-  header: {
-    padding: 24,
-    paddingBottom: 16,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-  },
-  form: {
-    padding: 24,
-    gap: 24,
-  },
-  inputGroup: {
-    gap: 8,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  amountContainer: {
+  multiline: { minHeight: 80, textAlignVertical: 'top' },
+  primaryButton: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  currencySymbol: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#6B7280',
-    marginRight: 8,
-  },
-  amountInput: {
-    flex: 1,
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1F2937',
-    paddingVertical: 16,
-  },
-  textInput: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    fontSize: 16,
-    color: '#1F2937',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  categoriesContainer: {
-    gap: 12,
-  },
-  categoryOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  categoryOptionSelected: {
-    borderColor: '#10B981',
-    backgroundColor: '#F0FDF4',
-  },
-  categoryOptionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    backgroundColor: '#2563EB',
+    padding: 12,
+    borderRadius: 10,
+    gap: 8,
   },
-  categoryOptionEmoji: {
-    fontSize: 20,
-  },
-  categoryOptionText: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  checkIcon: {
-    marginLeft: 8,
-  },
-  dateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  buttonText: { color: '#fff', fontWeight: '600' },
+  listSection: { padding: 20 },
+  sectionTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8, color: '#0F172A' },
+  emptyText: { color: '#64748B' },
+  habitCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  dateText: {
-    fontSize: 16,
-    color: '#1F2937',
-    marginLeft: 12,
-  },
-  submitButton: {
-    backgroundColor: '#10B981',
-    borderRadius: 12,
-    padding: 18,
+    padding: 12,
+    marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 16,
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
   },
-  submitButtonDisabled: {
-    backgroundColor: '#9CA3AF',
-  },
-  submitButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
-  },
+  habitTextWrap: { flex: 1, paddingRight: 12 },
+  habitName: { fontWeight: '600', fontSize: 16, color: '#0F172A' },
+  habitDescription: { marginTop: 4, color: '#64748B' },
+  actions: { flexDirection: 'row', gap: 6 },
+  iconButton: { padding: 8, borderRadius: 8, backgroundColor: '#EFF6FF' },
 });

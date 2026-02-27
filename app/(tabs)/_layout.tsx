@@ -1,12 +1,12 @@
 import { Tabs } from 'expo-router';
-import { Plus, Chrome as Home, List, User } from 'lucide-react-native';
+import { CalendarCheck2, ChartNoAxesCombined, Plus, User } from 'lucide-react-native';
 
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#10B981',
+        tabBarActiveTintColor: '#2563EB',
         tabBarInactiveTintColor: '#6B7280',
         tabBarStyle: {
           backgroundColor: '#FFFFFF',
@@ -14,7 +14,7 @@ export default function TabLayout() {
           borderTopColor: '#E5E7EB',
           paddingBottom: 8,
           paddingTop: 8,
-          height: 70,
+          height: 72,
         },
         tabBarLabelStyle: {
           fontSize: 12,
@@ -24,37 +24,29 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Dashboard',
-          tabBarIcon: ({ size, color }) => (
-            <Home size={size} color={color} />
-          ),
+          title: 'Today',
+          tabBarIcon: ({ size, color }) => <CalendarCheck2 size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="add"
         options={{
-          title: 'Add',
-          tabBarIcon: ({ size, color }) => (
-            <Plus size={size} color={color} />
-          ),
+          title: 'Manage',
+          tabBarIcon: ({ size, color }) => <Plus size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="expenses"
         options={{
-          title: 'Expenses',
-          tabBarIcon: ({ size, color }) => (
-            <List size={size} color={color} />
-          ),
+          title: 'Views',
+          tabBarIcon: ({ size, color }) => <ChartNoAxesCombined size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ size, color }) => (
-            <User size={size} color={color} />
-          ),
+          tabBarIcon: ({ size, color }) => <User size={size} color={color} />,
         }}
       />
     </Tabs>
